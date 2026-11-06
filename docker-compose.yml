@@ -1,0 +1,168 @@
+services:
+
+  # ===================== Bases de datos (una por servicio) =====================
+  postgres-users:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: users_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports: ["5433:5432"]
+    volumes: [pgdata-users:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d users_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [reservas-net]
+
+  postgres-resources:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: resources_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports: ["5434:5432"]
+    volumes: [pgdata-resources:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d resources_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [reservas-net]
+
+  postgres-reservations:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: reservations_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports: ["5435:5432"]
+    volumes: [pgdata-reservations:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d reservations_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [reservas-net]
+
+  postgres-notifications:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: notifications_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports: ["5436:5432"]
+    volumes: [pgdata-notifications:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d notifications_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [reservas-net]
+
+  mongodb-audit:
+    image: mongo:8
+    ports: ["27017:27017"]
+    volumes: [mongodata-audit:/data/db]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [reservas-net]
+
+  # ===================== Microservicios =====================
+  audit-service:
+    build: ./audit-service
+    ports: ["8084:8084"]
+    environment:
+      MONGO_URI: mongodb://mongodb-audit:27017/audit_db
+    depends_on:
+      mongodb-audit: {condition: service_healthy}
+    networks: [reservas-net]
+
+  notification-service:
+    build: ./notification-service
+    ports: ["8085:8085"]
+    environment:
+      DB_URL: jdbc:postgresql://postgres-notifications:5432/notifications_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+    depends_on:
+      postgres-notifications: {condition: service_healthy}
+    networks: [reservas-net]
+
+  user-service:
+    build: ./user-service
+    ports: ["8081:8081"]
+    environment:
+      DB_URL: jdbc:postgresql://postgres-users:5432/users_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      AUDIT_SERVICE_URL: http://audit-service:8084
+      EMAIL_DOMAIN: universidad.edu.co
+    depends_on:
+      postgres-users: {condition: service_healthy}
+      audit-service: {condition: service_started}
+    networks: [reservas-net]
+
+  resource-service:
+    build: ./resource-service
+    ports: ["8082:8082"]
+    environment:
+      DB_URL: jdbc:postgresql://postgres-resources:5432/resources_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      AUDIT_SERVICE_URL: http://audit-service:8084
+    depends_on:
+      postgres-resources: {condition: service_healthy}
+      audit-service: {condition: service_started}
+    networks: [reservas-net]
+
+  reservation-service:
+    build: ./reservation-service
+    ports: ["8083:8083"]
+    environment:
+      DB_URL: jdbc:postgresql://postgres-reservations:5432/reservations_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      USER_SERVICE_URL: http://user-service:8081
+      RESOURCE_SERVICE_URL: http://resource-service:8082
+      AUDIT_SERVICE_URL: http://audit-service:8084
+      NOTIFICATION_SERVICE_URL: http://notification-service:8085
+    depends_on:
+      postgres-reservations: {condition: service_healthy}
+      user-service: {condition: service_started}
+      resource-service: {condition: service_started}
+      audit-service: {condition: service_started}
+      notification-service: {condition: service_started}
+    networks: [reservas-net]
+
+  api-gateway:
+    build: ./api-gateway
+    ports: ["8080:8080"]
+    environment:
+      USER_SERVICE_URL: http://user-service:8081
+      RESOURCE_SERVICE_URL: http://resource-service:8082
+      RESERVATION_SERVICE_URL: http://reservation-service:8083
+      AUDIT_SERVICE_URL: http://audit-service:8084
+      NOTIFICATION_SERVICE_URL: http://notification-service:8085
+    depends_on:
+      - user-service
+      - resource-service
+      - reservation-service
+      - audit-service
+      - notification-service
+    networks: [reservas-net]
+
+networks:
+  reservas-net:
+    driver: bridge
+
+volumes:
+  pgdata-users:
+  pgdata-resources:
+  pgdata-reservations:
+  pgdata-notifications:
+  mongodata-audit:

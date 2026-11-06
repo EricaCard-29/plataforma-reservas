@@ -1,0 +1,9 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: audit-service
+  data:
+    mongodb:
+      uri: ${MONGO_URI:mongodb://localhost:27017/audit_db}

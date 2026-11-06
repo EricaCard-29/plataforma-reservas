@@ -1,0 +1,21 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: reservation-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5435/reservations_db}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:postgres}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+
+# Direcciones de los otros microservicios (en Docker se reemplazan por variables de entorno)
+services:
+  user-url: ${USER_SERVICE_URL:http://localhost:8081}
+  resource-url: ${RESOURCE_SERVICE_URL:http://localhost:8082}
+  audit-url: ${AUDIT_SERVICE_URL:http://localhost:8084}
+  notification-url: ${NOTIFICATION_SERVICE_URL:http://localhost:8085}

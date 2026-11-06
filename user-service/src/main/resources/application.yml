@@ -1,0 +1,21 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: user-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/users_db}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:postgres}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+
+app:
+  # Dominio que debe tener el correo institucional. Cámbialo por el de tu universidad.
+  email-domain: ${EMAIL_DOMAIN:universidad.edu.co}
+
+services:
+  audit-url: ${AUDIT_SERVICE_URL:http://localhost:8084}

@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reservas de laboratorios</title>
+<style>
+:root{--bg:#eef2f5;--card:#fff;--ink:#14202e;--mut:#5d6b7c;--line:#d9e0e7;--acc:#0b6e6e;--accb:#e0f1f0;--ok:#12805c;--err:#b8321f;--warn:#9a5b06}
+@media(prefers-color-scheme:dark){:root{--bg:#0f161e;--card:#17212b;--ink:#e6edf4;--mut:#93a2b3;--line:#27333f;--acc:#4fc0bd;--accb:#143232;--ok:#4cc9a0;--err:#ff8a73;--warn:#f0b95a}}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+header{background:var(--card);border-bottom:1px solid var(--line)}
+.bar{max-width:1040px;margin:auto;padding:18px 20px 0}
+h1{font:600 26px/1.2 Georgia,"Times New Roman",serif;margin:0 0 14px}
+nav{display:flex;gap:6px;overflow-x:auto}
+nav button{border:0;border-bottom:3px solid transparent;background:none;color:var(--mut);font:inherit;padding:8px 14px;cursor:pointer}
+nav button.on{color:var(--ink);border-color:var(--acc);font-weight:600}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+main{max-width:1040px;margin:24px auto 80px;padding:0 20px}
+section{display:none}section.on{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:20px;margin-bottom:20px}
+.book{border-left:5px solid var(--acc)}
+h2{font:600 18px/1.3 Georgia,serif;margin:0 0 4px}
+.hint{color:var(--mut);margin:0 0 16px;font-size:14px}
+form{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+label{display:flex;flex-direction:column;font-size:13px;color:var(--mut);gap:4px}
+input,select{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+.full{grid-column:1/-1}
+.btn{font:inherit;font-weight:600;background:var(--acc);color:#fff;border:0;border-radius:6px;padding:10px 18px;cursor:pointer;justify-self:start}
+@media(prefers-color-scheme:dark){.btn{color:#06201f}}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:13px;color:var(--mut);font-weight:600}
+.empty{text-align:center;color:var(--mut);padding:24px}
+.b{padding:1px 9px;border-radius:99px;font-size:12px;border:1px solid currentColor}
+.APROBADA,.DISPONIBLE,.ACTIVO,.FINALIZADA{color:var(--ok)}
+.CANCELADA,.RECHAZADA,.FUERA_DE_SERVICIO,.INACTIVO{color:var(--err)}
+.PENDIENTE,.MANTENIMIENTO,.OCUPADO{color:var(--warn)}
+.link{background:none;border:0;color:var(--err);cursor:pointer;font:inherit;padding:0;text-decoration:underline}
+td select{padding:4px 6px}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);max-width:90%;padding:11px 18px;border-radius:8px;color:#fff;opacity:0;pointer-events:none;transition:opacity .2s}
+#toast.show{opacity:1}#toast.ok{background:#12805c}#toast.err{background:#b8321f}
+@media(prefers-reduced-motion:reduce){#toast{transition:none}}
+</style>
+</head>
+<body>
+<header><div class="bar">
+  <h1>Reservas de laboratorios</h1>
+  <nav id="tabs">
+    <button data-t="reservas" class="on">Reservas</button>
+    <button data-t="usuarios">Usuarios</button>
+    <button data-t="recursos">Recursos</button>
+  </nav>
+</div></header>
+
+<main>
+<section id="reservas" class="on">
+  <div class="card book">
+    <h2>Reservar un recurso</h2>
+    <p class="hint">Solo aparecen usuarios activos y recursos disponibles. Si el horario se cruza con otra reserva, te avisamos.</p>
+    <form id="f-res">
+      <label>Usuario<select id="r-user" required></select></label>
+      <label>Recurso<select id="r-res" required></select></label>
+      <label>Fecha<input type="date" id="r-fecha" required></label>
+      <label>Hora de inicio<input type="time" id="r-ini" required></label>
+      <label>Hora de fin<input type="time" id="r-fin" required></label>
+      <label class="full">Motivo<input id="r-motivo" required placeholder="Ej. Práctica de redes"></label>
+      <button class="btn">Reservar</button>
+    </form>
+  </div>
+  <div class="card">
+    <h2>Todas las reservas</h2>
+    <div class="scroll"><table>
+      <thead><tr><th>N.º</th><th>Usuario</th><th>Recurso</th><th>Fecha</th><th>Horario</th><th>Motivo</th><th>Estado</th><th></th></tr></thead>
+      <tbody id="r-body"></tbody>
+    </table></div>
+  </div>
+</section>
+
+<section id="usuarios">
+  <div class="card book">
+    <h2>Registrar usuario</h2>
+    <p class="hint">El correo debe ser institucional (el dominio se configura en el user-service).</p>
+    <form id="f-user">
+      <label>Nombre<input id="u-nombre" required></label>
+      <label>Apellido<input id="u-apellido" required></label>
+      <label>Documento<input id="u-doc" required></label>
+      <label>Correo institucional<input type="email" id="u-correo" required placeholder="nombre@universidad.edu.co"></label>
+      <label>Teléfono<input id="u-tel"></label>
+      <label>Rol<select id="u-rol"><option>ESTUDIANTE</option><option>DOCENTE</option><option>INVESTIGADOR</option><option>ADMINISTRATIVO</option></select></label>
+      <button class="btn">Registrar usuario</button>
+    </form>
+  </div>
+  <div class="card">
+    <h2>Usuarios registrados</h2>
+    <div class="scroll"><table>
+      <thead><tr><th>N.º</th><th>Nombre</th><th>Correo</th><th>Documento</th><th>Rol</th><th>Estado</th><th></th></tr></thead>
+      <tbody id="u-body"></tbody>
+    </table></div>
+  </div>
+</section>
+
+<section id="recursos">
+  <div class="card book">
+    <h2>Registrar recurso</h2>
+    <p class="hint">Cambia el estado en la tabla: solo los recursos disponibles se pueden reservar.</p>
+    <form id="f-rec">
+      <label>Nombre<input id="c-nombre" required></label>
+      <label>Tipo<select id="c-tipo"><option>LABORATORIO</option><option>SALA_COMPUTO</option><option>AUDITORIO</option><option>EQUIPO_TECNOLOGICO</option><option>SALA_MULTIMEDIA</option></select></label>
+      <label>Ubicación<input id="c-ubi" required></label>
+      <label>Capacidad<input type="number" id="c-cap" min="0" value="30" required></label>
+      <label class="full">Descripción<input id="c-desc"></label>
+      <button class="btn">Registrar recurso</button>
+    </form>
+  </div>
+  <div class="card">
+    <h2>Catálogo de recursos</h2>
+    <div class="scroll"><table>
+      <thead><tr><th>N.º</th><th>Nombre</th><th>Tipo</th><th>Ubicación</th><th>Capacidad</th><th>Estado</th><th></th></tr></thead>
+      <tbody id="c-body"></tbody>
+    </table></div>
+  </div>
+</section>
+</main>
+<div id="toast" role="status"></div>
+
+<script>
+// Servido por el API Gateway las rutas son relativas. Si abres el archivo directo, usa localhost:8080.
+const BASE = location.protocol === 'file:' ? 'http://localhost:8080' : '';
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const nice = s => esc(String(s).replace(/_/g, ' ').toLowerCase().replace(/^./, c => c.toUpperCase()));
+const ESTADOS = ['DISPONIBLE', 'OCUPADO', 'MANTENIMIENTO', 'FUERA_DE_SERVICIO'];
+let users = [], resources = [], reservations = [];
+
+async function api(path, method = 'GET', body) {
+  let r;
+  try {
+    r = await fetch(BASE + path, { method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+  } catch (e) {
+    throw new Error('No se pudo conectar con el servidor. Revisa que docker compose esté corriendo.');
+  }
+  const txt = await r.text();
+  let d = null;
+  try { d = txt ? JSON.parse(txt) : null; } catch (e) {}
+  if (!r.ok) {
+    const det = d && d.detalles && d.detalles.length ? ' (' + d.detalles.join('; ') + ')' : '';
+    throw new Error((d && d.message || 'Error ' + r.status) + det);
+  }
+  return d;
+}
+function toast(msg, ok) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.className = 'show ' + (ok ? 'ok' : 'err');
+  clearTimeout(toast.t);
+  toast.t = setTimeout(() => t.className = '', 5000);
+}
+async function run(fn, okMsg) {
+  try { await fn(); if (okMsg) toast(okMsg, true); } catch (e) { toast(e.message, false); }
+}
+async function load() {
+  await run(async () => {
+    [users, resources, reservations] = await Promise.all([api('/users'), api('/resources'), api('/reservations')]);
+    render();
+  });
+}
+
+function render() {
+  $('#r-user').innerHTML = users.filter(u => u.estado === 'ACTIVO').map(u => `<option value="${u.id}">${esc(u.nombre)} ${esc(u.apellido)}</option>`).join('') || '<option value="">Primero registra un usuario</option>';
+  $('#r-res').innerHTML = resources.filter(r => r.estado === 'DISPONIBLE').map(r => `<option value="${r.id}">${esc(r.nombre)} - ${esc(r.ubicacion)} (cap. ${r.capacidad})</option>`).join('') || '<option value="">No hay recursos disponibles</option>';
+  const uName = id => { const u = users.find(x => x.id === id); return u ? esc(u.nombre + ' ' + u.apellido) : 'N.º ' + id; };
+  const rName = id => { const r = resources.find(x => x.id === id); return r ? esc(r.nombre) : 'N.º ' + id; };
+  $('#r-body').innerHTML = reservations.slice().sort((a, b) => b.id - a.id).map(r => `<tr><td>${r.id}</td><td>${uName(r.userId)}</td><td>${rName(r.resourceId)}</td><td>${esc(r.fechaReserva)}</td><td>${esc(r.horaInicio).slice(0, 5)} a ${esc(r.horaFin).slice(0, 5)}</td><td>${esc(r.motivo)}</td><td><span class="b ${r.estado}">${nice(r.estado)}</span></td><td>${['APROBADA', 'PENDIENTE'].includes(r.estado) ? `<button class="link" data-cancel="${r.id}">Cancelar reserva</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="8" class="empty">Aún no hay reservas. Crea la primera con el formulario de arriba.</td></tr>';
+  $('#u-body').innerHTML = users.map(u => `<tr><td>${u.id}</td><td>${esc(u.nombre)} ${esc(u.apellido)}</td><td>${esc(u.correoInstitucional)}</td><td>${esc(u.documento)}</td><td>${nice(u.rol)}</td><td><span class="b ${u.estado}">${nice(u.estado)}</span></td><td><button class="link" data-deluser="${u.id}">Eliminar</button></td></tr>`).join('') || '<tr><td colspan="7" class="empty">Aún no hay usuarios registrados.</td></tr>';
+  $('#c-body').innerHTML = resources.map(r => `<tr><td>${r.id}</td><td>${esc(r.nombre)}</td><td>${nice(r.tipo)}</td><td>${esc(r.ubicacion)}</td><td>${r.capacidad}</td><td><select data-est="${r.id}" class="${r.estado}">${ESTADOS.map(e => `<option value="${e}" ${e === r.estado ? 'selected' : ''}>${nice(e)}</option>`).join('')}</select></td><td><button class="link" data-delres="${r.id}">Eliminar</button></td></tr>`).join('') || '<tr><td colspan="7" class="empty">Aún no hay recursos en el catálogo.</td></tr>';
+}
+
+// Pestañas
+$('#tabs').addEventListener('click', e => {
+  const t = e.target.dataset.t;
+  if (!t) return;
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+  document.querySelectorAll('section').forEach(s => s.classList.toggle('on', s.id === t));
+});
+
+// Formularios
+$('#f-user').addEventListener('submit', e => {
+  e.preventDefault();
+  run(async () => {
+    await api('/users', 'POST', { nombre: $('#u-nombre').value.trim(), apellido: $('#u-apellido').value.trim(), documento: $('#u-doc').value.trim(), correoInstitucional: $('#u-correo').value.trim(), telefono: $('#u-tel').value.trim() || null, rol: $('#u-rol').value });
+    e.target.reset();
+    await load();
+  }, 'Usuario registrado');
+});
+$('#f-rec').addEventListener('submit', e => {
+  e.preventDefault();
+  run(async () => {
+    await api('/resources', 'POST', { nombre: $('#c-nombre').value.trim(), tipo: $('#c-tipo').value, ubicacion: $('#c-ubi').value.trim(), capacidad: Number($('#c-cap').value), descripcion: $('#c-desc').value.trim() || null });
+    e.target.reset();
+    await load();
+  }, 'Recurso registrado');
+});
+$('#f-res').addEventListener('submit', e => {
+  e.preventDefault();
+  run(async () => {
+    await api('/reservations', 'POST', { userId: Number($('#r-user').value), resourceId: Number($('#r-res').value), fechaReserva: $('#r-fecha').value, horaInicio: $('#r-ini').value, horaFin: $('#r-fin').value, motivo: $('#r-motivo').value.trim() });
+    $('#r-motivo').value = '';
+    await load();
+  }, 'Reserva creada y aprobada');
+});
+
+// Acciones de las tablas
+document.addEventListener('click', e => {
+  const d = e.target.dataset;
+  if (d.cancel && confirm('¿Cancelar la reserva N.º ' + d.cancel + '?')) run(async () => { await api('/reservations/' + d.cancel, 'DELETE'); await load(); }, 'Reserva cancelada');
+  if (d.deluser && confirm('¿Eliminar este usuario?')) run(async () => { await api('/users/' + d.deluser, 'DELETE'); await load(); }, 'Usuario eliminado');
+  if (d.delres && confirm('¿Eliminar este recurso?')) run(async () => { await api('/resources/' + d.delres, 'DELETE'); await load(); }, 'Recurso eliminado');
+});
+document.addEventListener('change', e => {
+  const id = e.target.dataset.est;
+  if (!id) return;
+  const r = resources.find(x => x.id === Number(id));
+  run(async () => {
+    await api('/resources/' + id, 'PUT', { nombre: r.nombre, tipo: r.tipo, ubicacion: r.ubicacion, capacidad: r.capacidad, descripcion: r.descripcion, estado: e.target.value });
+    await load();
+  }, 'Estado actualizado');
+});
+
+const hoy = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+$('#r-fecha').min = hoy;
+$('#r-fecha').value = hoy;
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,651 @@
+{
+  "info": {
+    "name": "Plataforma de Reservas - Pruebas",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Ejecuta la colección completa con Collection Runner (en orden). Requiere el sistema corriendo en http://localhost:8080"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "userId",
+      "value": ""
+    },
+    {
+      "key": "resourceId",
+      "value": ""
+    },
+    {
+      "key": "reservationId",
+      "value": ""
+    },
+    {
+      "key": "suffix",
+      "value": ""
+    },
+    {
+      "key": "fecha",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Crear usuario (201)",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.collectionVariables.set('suffix', Date.now().toString());",
+              "const d = new Date(); d.setDate(d.getDate() + 30);",
+              "pm.collectionVariables.set('fecha', d.toISOString().slice(0,10));"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 201 CREATED', () => pm.response.to.have.status(201));",
+              "pm.collectionVariables.set('userId', pm.response.json().id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/users",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "users"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nombre\": \"Ana\",\n  \"apellido\": \"Pérez\",\n  \"documento\": \"{{suffix}}\",\n  \"correoInstitucional\": \"ana{{suffix}}@universidad.edu.co\",\n  \"telefono\": \"3001112233\",\n  \"rol\": \"ESTUDIANTE\"\n}"
+        }
+      }
+    },
+    {
+      "name": "2. Crear recurso (201)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Recurso registrado (201)', () => pm.response.to.have.status(201));",
+              "pm.test('Recurso DISPONIBLE', () => pm.expect(pm.response.json().estado).to.eql('DISPONIBLE'));",
+              "pm.collectionVariables.set('resourceId', pm.response.json().id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/resources",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "resources"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nombre\": \"Laboratorio de Redes {{suffix}}\",\n  \"tipo\": \"LABORATORIO\",\n  \"ubicacion\": \"Bloque A\",\n  \"capacidad\": 30,\n  \"descripcion\": \"Laboratorio con 30 equipos\"\n}"
+        }
+      }
+    },
+    {
+      "name": "3. Registrar reserva (aprobada)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+              "pm.test('Reserva APROBADA', () => pm.expect(pm.response.json().estado).to.eql('APROBADA'));",
+              "pm.collectionVariables.set('reservationId', pm.response.json().id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/reservations",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "reservations"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"resourceId\": \"{{resourceId}}\",\n  \"fechaReserva\": \"{{fecha}}\",\n  \"horaInicio\": \"09:00\",\n  \"horaFin\": \"11:00\",\n  \"motivo\": \"Práctica de redes\"\n}"
+        }
+      }
+    },
+    {
+      "name": "4. Reserva duplicada (409 CONFLICT)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 409 CONFLICT', () => pm.response.to.have.status(409));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/reservations",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "reservations"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"resourceId\": \"{{resourceId}}\",\n  \"fechaReserva\": \"{{fecha}}\",\n  \"horaInicio\": \"10:00\",\n  \"horaFin\": \"12:00\",\n  \"motivo\": \"Choca con la anterior\"\n}"
+        }
+      }
+    },
+    {
+      "name": "5. Notificación enviada al usuario",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Hay una CONFIRMACION', () => pm.expect(pm.response.json().some(n => n.tipo === 'CONFIRMACION')).to.be.true);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/notifications/user/{{userId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "notifications",
+            "user",
+            "{{userId}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "6. Auditoría registrada de la reserva",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Existe CREAR_RESERVA', () => pm.expect(pm.response.json().some(a => a.operacion === 'CREAR_RESERVA')).to.be.true);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/audit/referencia/reserva:{{reservationId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "audit",
+            "referencia",
+            "reserva:{{reservationId}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "7. Consultar reserva completa",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "const j = pm.response.json();",
+              "pm.test('Trae reserva, usuario, recurso e historial', () => { pm.expect(j.reserva).to.exist; pm.expect(j.usuario).to.exist; pm.expect(j.recurso).to.exist; pm.expect(j.historial.length).to.be.above(0); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/reservations/{{reservationId}}/completa",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "reservations",
+            "{{reservationId}}",
+            "completa"
+          ]
+        }
+      }
+    },
+    {
+      "name": "8. Reservas del usuario",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/reservations/user/{{userId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "reservations",
+            "user",
+            "{{userId}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "9. Recursos disponibles",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/resources/available",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "resources",
+            "available"
+          ]
+        }
+      }
+    },
+    {
+      "name": "10. Cancelar reserva",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Estado CANCELADA', () => pm.expect(pm.response.json().estado).to.eql('CANCELADA'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/reservations/{{reservationId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "reservations",
+            "{{reservationId}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "E1. Usuario con correo no institucional (400)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 400', () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/users",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "users"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nombre\": \"Luis\",\n  \"apellido\": \"Gómez\",\n  \"documento\": \"999\",\n  \"correoInstitucional\": \"luis@gmail.com\",\n  \"rol\": \"DOCENTE\"\n}"
+        }
+      }
+    },
+    {
+      "name": "E2. Usuario sin rol (400)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 400', () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/users",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "users"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nombre\": \"Luis\",\n  \"apellido\": \"Gómez\",\n  \"documento\": \"999\",\n  \"correoInstitucional\": \"luis@universidad.edu.co\"\n}"
+        }
+      }
+    },
+    {
+      "name": "E3. Correo duplicado (409)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 409', () => pm.response.to.have.status(409));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/users",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "users"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nombre\": \"Ana\",\n  \"apellido\": \"Otra\",\n  \"documento\": \"otro-{{suffix}}\",\n  \"correoInstitucional\": \"ana{{suffix}}@universidad.edu.co\",\n  \"rol\": \"DOCENTE\"\n}"
+        }
+      }
+    },
+    {
+      "name": "E4. Recurso con capacidad negativa (400)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 400', () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/resources",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "resources"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nombre\": \"Sala X\",\n  \"tipo\": \"AUDITORIO\",\n  \"ubicacion\": \"Bloque B\",\n  \"capacidad\": -10\n}"
+        }
+      }
+    },
+    {
+      "name": "E5. Usuario inexistente (404)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 404', () => pm.response.to.have.status(404));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/users/999999",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "users",
+            "999999"
+          ]
+        }
+      }
+    },
+    {
+      "name": "E6. Reserva para usuario inexistente (404)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 404', () => pm.response.to.have.status(404));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/reservations",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "reservations"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": 999999,\n  \"resourceId\": \"{{resourceId}}\",\n  \"fechaReserva\": \"{{fecha}}\",\n  \"horaInicio\": \"14:00\",\n  \"horaFin\": \"15:00\",\n  \"motivo\": \"x\"\n}"
+        }
+      }
+    },
+    {
+      "name": "E7. Reserva para recurso inexistente (404)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 404', () => pm.response.to.have.status(404));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/reservations",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "reservations"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"resourceId\": 999999,\n  \"fechaReserva\": \"{{fecha}}\",\n  \"horaInicio\": \"14:00\",\n  \"horaFin\": \"15:00\",\n  \"motivo\": \"x\"\n}"
+        }
+      }
+    }
+  ]
+}
